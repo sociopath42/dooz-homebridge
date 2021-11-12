@@ -24,9 +24,13 @@
     "prepublishOnly": "npm run lint && npm run build"
   },
   "keywords": [
-    "dooz"
+    "homebridge-plugin"
   ],
-  "dependencies": {},
+  "dependencies": {
+    "jaysonic": "^3.5.0",
+    "ws": "^8.2.3",
+    "wscat2": "^2.4.0"
+  },
   "devDependencies": {
     "@types/node": "^16.10.9",
     "@typescript-eslint/eslint-plugin": "^5.0.0",
