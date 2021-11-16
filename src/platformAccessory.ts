@@ -1,6 +1,7 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
-import { ExampleHomebridgePlatform } from './platform';
+import { ExampleHomebridgePlatform, DoozDeviceDef } from './platform';
+
 
 /**
  * Platform Accessory
@@ -22,13 +23,14 @@ export class ExamplePlatformAccessory {
   constructor(
     private readonly platform: ExampleHomebridgePlatform,
     private readonly accessory: PlatformAccessory,
+    private readonly device: DoozDeviceDef,
   ) {
 
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
+      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'DOOZ')
       .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, device.mac);
 
     // get the LightBulb service if it exists, otherwise create a new LightBulb service
     // you can create multiple services for each accessory
@@ -79,7 +81,7 @@ export class ExamplePlatformAccessory {
      */
     //    let motionDetected = false;
     setInterval(() => {
-      this.platform.log.debug('accessory timer ', this.accessory.displayName);
+    //  this.platform.log.debug('accessory timer ', this.accessory.displayName);
     //      // EXAMPLE - inverse the trigger
     //      motionDetected = !motionDetected;
     //
@@ -89,7 +91,21 @@ export class ExamplePlatformAccessory {
     //
     //      this.platform.log.debug('Triggering motionSensorOneService:', motionDetected);
     //      this.platform.log.debug('Triggering motionSensorTwoService:', !motionDetected);
-    }, 10000);
+    }, 10*60*1000);
+  }
+
+  updateState(level: number) {
+    const isOn = (level > 0);
+    this.exampleStates.On = isOn;
+    this.service.updateCharacteristic(this.platform.Characteristic.On, isOn);
+    if (isOn) {
+      this.exampleStates.Brightness = level;
+      this.service.updateCharacteristic(this.platform.Characteristic.Brightness, level);
+    }
+  }
+
+  getUnicast() {
+    return this.device.unicast;
   }
 
   /**
@@ -99,8 +115,16 @@ export class ExamplePlatformAccessory {
   async setOn(value: CharacteristicValue) {
     // implement your own code to turn your device on/off
     this.exampleStates.On = value as boolean;
-
+    const state: string = value ? 'on' : 'off';
     this.platform.log.debug('Set Characteristic On ->', value);
+    this.platform.webSocketClient
+      .send('set', {address: this.device.unicast, level: state})
+      .then((result) => {
+        console.log('set on ok '+this.device.unicast);
+      })
+      .catch((error) => {
+        console.log('set on fail '+this.device.unicast);
+      });
   }
 
   /**
@@ -118,7 +142,19 @@ export class ExamplePlatformAccessory {
    */
   async getOn(): Promise<CharacteristicValue> {
     // implement your own code to check if the device is on
-    const isOn = this.exampleStates.On;
+    let isOn = this.exampleStates.On;
+    this.platform.webSocketClient
+      .send('get', {address: this.device.unicast})
+      .then((result) => {
+        console.log('get '+result.result.level+' ok '+this.device.unicast);
+        isOn = (result.result.level > 0);
+        this.exampleStates.On = isOn;
+        this.exampleStates.Brightness = result.result.level as number;
+        this.updateState(result.result.level);
+      })
+      .catch((error) => {
+        console.log('get fail '+this.device.unicast);
+      });
 
     this.platform.log.debug('Get Characteristic On ->', isOn);
 
@@ -135,8 +171,17 @@ export class ExamplePlatformAccessory {
   async setBrightness(value: CharacteristicValue) {
     // implement your own code to set the brightness
     this.exampleStates.Brightness = value as number;
+    this.platform.webSocketClient
+      .send('set', {address: this.device.unicast, level: value})
+      .then((result) => {
+        console.log('set '+result.level+' ok '+this.device.unicast);
+        this.exampleStates.Brightness = result.leve as number;
+      })
+      .catch((error) => {
+        console.log('set fail '+this.device.unicast);
+      });
 
-    this.platform.log.debug('Set Characteristic Brightness -> ', value);
+    this.platform.log.debug('Set Characteristic Brightness -> ', this.exampleStates.Brightness);
   }
 
 }
