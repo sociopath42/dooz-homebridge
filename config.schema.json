@@ -5,12 +5,41 @@
   "schema": {
     "type": "object",
     "properties": {
-      "name": {
-        "title": "Name",
+      "localAddress": {
+        "title": "local address",
         "type": "string",
+        "format": "hostname",
         "required": true,
-        "default": "Dooz bridge"
+        "default": "DOOZ_OOPLA.local"
+      },
+      "accountEmail": {
+        "title": "App email",
+        "type": "string",
+        "format": "email",
+        "required": true,
+        "default": ""
+      },
+      "accountPassword": {
+        "title": "App password",
+        "type": "string",
+        "format": "password",
+        "required": true,
+        "default": ""
       }
     }
-  }
+  },
+  "layout": [
+    "localAddress",
+    {
+      "type": "flex",
+      "flex-flow": "row wrap",
+      "items": [
+        "accountEmail",
+        {
+          "key": "accountPassword",
+          "type": "password"
+        }
+      ]
+    }
+  ]
 }

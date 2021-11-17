@@ -16,6 +16,7 @@ export class DoozDeviceDef {
   public output_conf = 0;
 }
 
+import dns = require('dns');
 import jaysonic = require('jaysonic');
 
 /**
@@ -31,8 +32,6 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
 
-  private static platformRef: ExampleHomebridgePlatform;
-
   public static accessoryMap: Map<string, ExamplePlatformAccessory> = new Map<string, ExamplePlatformAccessory>();
 
   constructor(
@@ -41,7 +40,6 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
     public readonly api: API,
   ) {
     this.log.debug('Finished initializing platform:', this.config.name);
-    ExampleHomebridgePlatform.platformRef = this;
     // When this event is fired it means Homebridge has restored all cached accessories from disk.
     // Dynamic Platform plugins should only register new accessories after this event was fired,
     // in order to ensure they weren't added to homebridge already. This event can also be used
@@ -50,7 +48,7 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
       log.debug('Executed didFinishLaunching callback');
       // run the method to discover / register your devices as accessories
       log.debug('Leaving didFinishLaunching callback');
-      ExampleHomebridgePlatform.platformRef.connectOopla();
+      this.connectOopla();
       //      setTimeout(() => {
       //      }, 5000);
     });
@@ -73,22 +71,27 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
 
   connectOopla() {
     this.log.debug('connect oopla');
-    //const host = '192.168.1.73';
-    //const port = 55055;
-    //const self = this;
+    let host = this.config.localAddress;
+    dns.lookup(this.config.localAddress, (err, result) => {
+      console.log(this.config.localAddress);
+      console.log(err);
+      console.log(result);
+      host = result;
+      // TODO sanity checks if error
+    });
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     this.webSocketClient = new jaysonic.client.ws({
-      url: 'wss://DOOZ-OOPLA.local:55055',
+      url: 'wss://'+host+':55055',
       secure: true,
       strictSSL: false,
       rejectUnauthorized: false,
       secureProtocol: 'SSLv3_method',
-      host: 'DOOZ-OOPLA.local',
+      host: host,
       port: 55055,
     });
-    jaysonic.logging.setLogger(ExampleHomebridgePlatform.platformRef.log);
+    jaysonic.logging.setLogger(this.log);
     this.webSocketClient.serverDisconnected(() => {
-      ExampleHomebridgePlatform.platformRef.log.debug('disconnected');
+      this.log.debug('disconnected');
     });
     this.webSocketClient
       .connect()
@@ -196,8 +199,8 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
             }
           }
         };
-        ExampleHomebridgePlatform.platformRef.log.info(`connected to ${host.target._url}`);
-        ExampleHomebridgePlatform.platformRef.webSocketClient.subscribe('notify_state', (message) => {
+        this.log.info(`connected to ${host.target._url}`);
+        this.webSocketClient.subscribe('notify_state', (message) => {
           console.log('lemme handle notify_state');
           console.log(message);
           if ('params' in message) {
@@ -209,10 +212,10 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
           // TODO : find the accessory by unicast and update characteristic level
           // {jsonrpc: "2.0", method: "notification", params: []}
         });
-        ExampleHomebridgePlatform.platformRef.onOoplaConnected();
+        this.onOoplaConnected();
       })
       .catch((error) => {
-        ExampleHomebridgePlatform.platformRef.log.debug(`connection error : ${error}`);
+        this.log.debug(`connection error : ${error}`);
         console.log(error);
       });
 
@@ -223,21 +226,21 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
 
   onOoplaSocketError() {
   //  this.log.debug('ERROR');
-    ExampleHomebridgePlatform.platformRef.log.debug('error');
+    this.log.debug('error');
   }
 
   onOoplaConnected() {
-    ExampleHomebridgePlatform.platformRef.log.debug('connected');
-    ExampleHomebridgePlatform.platformRef.authenticateFireBase();
+    this.log.debug('connected');
+    this.authenticateFireBase();
     // this.log.debug('connected');
   }
 
   onOoplaDisconnected() {
-    ExampleHomebridgePlatform.platformRef.log.debug('disconnected');
+    this.log.debug('disconnected');
   }
 
   onOoplaMessage(data) {
-    ExampleHomebridgePlatform.platformRef.log.debug('got from oopla');
+    this.log.debug('got from oopla');
     //this.log.debug(`got from oopla : ${data.data} ms`);
     console.log(data);
 
@@ -247,16 +250,16 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
   }
 
   authenticateFireBase() {
-    ExampleHomebridgePlatform.platformRef.log.debug('start auth');
-    ExampleHomebridgePlatform.platformRef.webSocketClient
+    this.log.debug('start auth');
+    this.webSocketClient
       .send('authenticate',
         {
-          login: 'email@gmail.com',
-          password:'pass',
+          login: this.config.accountEmail,
+          password: this.config.accountPassword,
         })
       .then((result) => {
         // TODO check if false.....
-        ExampleHomebridgePlatform.platformRef.discoverDevices();      // {jsonrpc: "2.0", result: 3, id: 1}
+        this.discoverDevices();      // {jsonrpc: "2.0", result: 3, id: 1}
       })
       .catch((error) => {
         console.log(error);
@@ -265,8 +268,8 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
 
   onOoplaAuthenticated(message: string) {
     if (message === 'ok') {
-      ExampleHomebridgePlatform.platformRef.log.debug('authentication ok');
-      ExampleHomebridgePlatform.platformRef.discoverDevices();
+      this.log.debug('authentication ok');
+      this.discoverDevices();
     }
   }
 
@@ -277,7 +280,7 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
    * must not be registered again to prevent "duplicate UUID" errors.
    */
   discoverDevices() {
-    ExampleHomebridgePlatform.platformRef.webSocketClient
+    this.webSocketClient
       .send('discover', null)
       .then((result) => {
         //console.log(result['result']['mesh']);
@@ -313,8 +316,8 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
                       room: roomName,
                       output_conf: outputType,
                     };
-                    //ExampleHomebridgePlatform.platformRef.registerDevice(macAddr, unicastAddr, outputType, eqName, roomName);
-                    ExampleHomebridgePlatform.platformRef.registerDevice(device);
+                    //this.registerDevice(macAddr, unicastAddr, outputType, eqName, roomName);
+                    this.registerDevice(device);
                     //console.log('equip name - '+equipement['name']);
                     //console.log('equip addr - '+equipement['address']);
                   }
