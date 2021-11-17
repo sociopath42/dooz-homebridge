@@ -120,10 +120,10 @@ export class ExamplePlatformAccessory {
     this.platform.webSocketClient
       .send('set', {address: this.device.unicast, level: state})
       .then((result) => {
-        this.platform.log.debug('set on ok '+this.device.unicast);
+        this.platform.log.debug('set on ok '+this.device.unicast, result);
       })
       .catch((error) => {
-        this.platform.log.debug('set on fail '+this.device.unicast);
+        this.platform.log.debug('set on fail '+this.device.unicast, error);
       });
   }
 
@@ -153,7 +153,7 @@ export class ExamplePlatformAccessory {
         this.updateState(result.result.level);
       })
       .catch((error) => {
-        this.platform.log.debug('get fail '+this.device.unicast);
+        this.platform.log.debug('get fail '+this.device.unicast, error);
       });
 
     this.platform.log.debug('Get Characteristic On ->', isOn);
@@ -178,7 +178,7 @@ export class ExamplePlatformAccessory {
         this.exampleStates.Brightness = result.leve as number;
       })
       .catch((error) => {
-        this.platform.log.debug('set fail '+this.device.unicast);
+        this.platform.log.debug('set fail '+this.device.unicast, error);
       });
 
     this.platform.log.debug('Set Characteristic Brightness -> ', this.exampleStates.Brightness);

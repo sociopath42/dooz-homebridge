@@ -255,6 +255,7 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
           password: this.config.accountPassword,
         })
       .then((result) => {
+        this.log.debug(result);
         // TODO check if false.....
         this.discoverDevices();      // {jsonrpc: "2.0", result: 3, id: 1}
       })
