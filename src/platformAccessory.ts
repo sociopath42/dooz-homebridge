@@ -1,6 +1,6 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
-import { ExampleHomebridgePlatform, DoozDeviceDef } from './platform';
+import { DoozHomebridgePlatform, DoozDeviceDef } from './platform';
 
 
 /**
@@ -8,7 +8,7 @@ import { ExampleHomebridgePlatform, DoozDeviceDef } from './platform';
  * An instance of this class is created for each accessory your platform registers
  * Each accessory may expose multiple services of different service types.
  */
-export class ExamplePlatformAccessory {
+export class DoozLightAccessory {
   private service: Service;
 
   /**
@@ -21,7 +21,7 @@ export class ExamplePlatformAccessory {
   };
 
   constructor(
-    private readonly platform: ExampleHomebridgePlatform,
+    private readonly platform: DoozHomebridgePlatform,
     private readonly accessory: PlatformAccessory,
     private readonly device: DoozDeviceDef,
   ) {

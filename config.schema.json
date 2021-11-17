@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
+  "pluginAlias": "DoozHomebridgePlatform",
   "pluginType": "platform",
   "singular": true,
   "schema": {

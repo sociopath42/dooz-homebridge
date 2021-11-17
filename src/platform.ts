@@ -1,7 +1,7 @@
 import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import { ExamplePlatformAccessory } from './platformAccessory';
+import { DoozLightAccessory } from './platformAccessory';
 
 import _require2 = require('jaysonic/lib/util/constants');
 const ERR_CODES = _require2.ERR_CODES;
@@ -24,7 +24,7 @@ import jaysonic = require('jaysonic');
  * This class is the main constructor for your plugin, this is where you should
  * parse the user config and discover/register accessories with Homebridge.
  */
-export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
+export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
 
@@ -32,7 +32,7 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
 
-  public static accessoryMap: Map<string, ExamplePlatformAccessory> = new Map<string, ExamplePlatformAccessory>();
+  public static accessoryMap: Map<string, DoozLightAccessory> = new Map<string, DoozLightAccessory>();
 
   constructor(
     public readonly log: Logger,
@@ -203,7 +203,7 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
           if ('params' in message) {
             if ('level' in message.params &&
                 'address' in message.params) {
-              ExampleHomebridgePlatform.accessoryMap[message.params.address].updateState(message.params.level);
+              DoozHomebridgePlatform.accessoryMap[message.params.address].updateState(message.params.level);
             }
           }
           // TODO : find the accessory by unicast and update characteristic level
@@ -372,9 +372,9 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
 
       // create the accessory handler for the restored accessory
       // this is imported from `platformAccessory.ts`
-      const eq: ExamplePlatformAccessory = new ExamplePlatformAccessory(this, existingAccessory, device);
+      const eq: DoozLightAccessory = new DoozLightAccessory(this, existingAccessory, device);
 
-      ExampleHomebridgePlatform.accessoryMap[device.unicast] = eq;
+      DoozHomebridgePlatform.accessoryMap[device.unicast] = eq;
 
       // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, eg.:
       // remove platform accessories when no longer present
@@ -393,7 +393,7 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
 
       // create the accessory handler for the newly create accessory
       // this is imported from `platformAccessory.ts`
-      new ExamplePlatformAccessory(this, accessory, device);
+      new DoozLightAccessory(this, accessory, device);
 
       // link the accessory to your platform
       this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);

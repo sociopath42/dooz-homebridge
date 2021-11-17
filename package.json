@@ -7,7 +7,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sociopath42/dooz-homebrige.git"
+    "url": "git+https://github.com/sociopath42/dooz-homebridge.git"
   },
   "bugs": {
     "url": "https://github.com/sociopath42/dooz-homebridge/issues"
