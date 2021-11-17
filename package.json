@@ -3,14 +3,14 @@
   "displayName": "Dooz home bridge",
   "name": "homebridge-plugin-dooz",
   "version": "0.0.1",
-  "description": "Dooz - connect your voice assistants to dooz oopla, Warning, POC project",
+  "description": "Dooz - connect your voice assistants to dooz oopla, Warning, BETA project",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git://github.com/sociopath42/dooz-homebrige-poc.git"
+    "url": "git+https://github.com/sociopath42/dooz-homebrige.git"
   },
   "bugs": {
-    "url": "https://github.com/sociopath42/dooz-homebridge-poc/issues"
+    "url": "https://github.com/sociopath42/dooz-homebridge/issues"
   },
   "engines": {
     "node": ">=14.18.1",
