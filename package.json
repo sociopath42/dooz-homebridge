@@ -1,5 +1,5 @@
 {
-  "private": true,
+  "private": false,
   "displayName": "Dooz home bridge",
   "name": "homebridge-plugin-dooz",
   "version": "0.0.1",
