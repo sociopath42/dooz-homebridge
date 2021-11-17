@@ -73,9 +73,6 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
     this.log.debug('connect oopla');
     let host = this.config.localAddress;
     dns.lookup(this.config.localAddress, (err, result) => {
-      console.log(this.config.localAddress);
-      console.log(err);
-      console.log(result);
       host = result;
       // TODO sanity checks if error
     });
@@ -96,10 +93,10 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
     this.webSocketClient
       .connect()
       .then((host) => {
-        //console.log(host);
-        //console.log(this.webSocketClient.pcolInstance);
+        //this.log.debug(host);
+        //this.log.debug(this.webSocketClient.pcolInstance);
         this.webSocketClient.pcolInstance.messageBuffer.getMessage = function() {
-          //console.log('MY GET MESSAGE');
+          //this.log.debug('MY GET MESSAGE');
           let dquote = 0;
           let braketDeepth = 0;
           let delimiterIndex = -1;
@@ -119,20 +116,20 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
               break;
             }
           }
-          //console.log('MY GET MESSAGE ', index, braketDeepth);
+          //this.log.debug('MY GET MESSAGE ', index, braketDeepth);
 
           if (delimiterIndex !== -1) {
             const message = this.buffer.slice(0, delimiterIndex+1);
             this.buffer = this.buffer.replace(message, '');
-            //console.log(message);
+            //this.log.debug(message);
             return message;
           }
-          //console.log(this.buffer);
+          //this.log.debug(this.buffer);
           return (null);
         };
         this.webSocketClient.pcolInstance.messageBuffer.isFinished = function() {
-          //console.log('MY IS FINISH BUFFER');
-          //console.log(this.buffer);
+          //this.log.debug('MY IS FINISH BUFFER');
+          //this.log.debug(this.buffer);
 
           if (this.buffer.length === 0) {
             return true;
@@ -201,8 +198,8 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
         };
         this.log.info(`connected to ${host.target._url}`);
         this.webSocketClient.subscribe('notify_state', (message) => {
-          console.log('lemme handle notify_state');
-          console.log(message);
+          this.log.debug('lemme handle notify_state');
+          this.log.debug(message);
           if ('params' in message) {
             if ('level' in message.params &&
                 'address' in message.params) {
@@ -216,11 +213,11 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
       })
       .catch((error) => {
         this.log.debug(`connection error : ${error}`);
-        console.log(error);
+        this.log.debug(error);
       });
 
-    //this.webSocketClient.end(() => console.log('connection ended'));
-    //console.log(this.webSocketClient);
+    //this.webSocketClient.end(() => this.log.debug('connection ended'));
+    //this.log.debug(this.webSocketClient);
 
   }
 
@@ -242,7 +239,7 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
   onOoplaMessage(data) {
     this.log.debug('got from oopla');
     //this.log.debug(`got from oopla : ${data.data} ms`);
-    console.log(data);
+    this.log.debug(data);
 
     setTimeout(() => {
       //      this.webSocket.send('lol');
@@ -262,7 +259,7 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
         this.discoverDevices();      // {jsonrpc: "2.0", result: 3, id: 1}
       })
       .catch((error) => {
-        console.log(error);
+        this.log.debug(error);
       });
   }
 
@@ -283,8 +280,8 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
     this.webSocketClient
       .send('discover', null)
       .then((result) => {
-        //console.log(result['result']['mesh']);
-        //console.log(result['result']['mesh'].keys);
+        //this.log.debug(result['result']['mesh']);
+        //this.log.debug(result['result']['mesh'].keys);
         for (const node of Object.entries(result['result']['mesh'])) {
           if (Array.isArray(node)) {
             //const nodeAddr = node[0];
@@ -294,15 +291,15 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
               if ('conf state' in nodeDef && nodeDef['conf state'] === 'CONFIGURED' &&
                   'nodes' in nodeDef && Array.isArray(nodeDef['nodes'])) {
                 // --------------------------------- prendre ici les infos du noeud
-                //console.log('discovered');
-                //console.log('mac '+nodeDef['mac_address']);
+                //this.log.debug('discovered');
+                //this.log.debug('mac '+nodeDef['mac_address']);
                 for (const nodeIndex in nodeDef['nodes']) {
                   const equipement = nodeDef['nodes'][nodeIndex];
                   if ('output conf' in equipement &&
                       'name' in equipement &&
                       'address' in equipement) {
                     // --------------------------------- prendre ici les infos de l'equipement
-                    //console.log(equipement);
+                    //this.log.debug(equipement);
                     const macAddr: string = nodeDef['mac_address'];
                     const unicastAddr: string = equipement['address'];
                     const outputType: number = equipement['output conf'];
@@ -318,22 +315,22 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
                     };
                     //this.registerDevice(macAddr, unicastAddr, outputType, eqName, roomName);
                     this.registerDevice(device);
-                    //console.log('equip name - '+equipement['name']);
-                    //console.log('equip addr - '+equipement['address']);
+                    //this.log.debug('equip name - '+equipement['name']);
+                    //this.log.debug('equip addr - '+equipement['address']);
                   }
                 }
               }
             }
           }
-          //console.log(node['nodes']);
+          //this.log.debug(node['nodes']);
           //for (const equipement of elements['nodes']) {
-          //  console.log(equipement);
+          //  this.log.debug(equipement);
           //}
         }
       // {jsonrpc: "2.0", result: 3, id: 1}
       })
       .catch((error) => {
-        console.log(error);
+        this.log.debug(error);
       });
   }
 
