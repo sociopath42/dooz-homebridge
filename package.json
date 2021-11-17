@@ -2,7 +2,7 @@
   "private": false,
   "displayName": "Dooz home bridge",
   "name": "homebridge-plugin-dooz",
-  "version": "2.0.0",
+  "version": "0.0.1",
   "description": "Dooz - connect your voice assistants to dooz oopla, Warning, BETA project",
   "license": "Apache-2.0",
   "repository": {
