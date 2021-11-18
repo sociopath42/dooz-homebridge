@@ -1,11 +1,21 @@
 import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import { DoozLightAccessory } from './platformAccessory';
+import { DoozLightAccessory } from './DoozLightAccessory';
+import { DoozShutterAccessory } from './DoozShutterAccessory';
 
 import _require2 = require('jaysonic/lib/util/constants');
 const ERR_CODES = _require2.ERR_CODES;
 const ERR_MSGS = _require2.ERR_MSGS;
+
+export class DoozEquipementType {
+  static readonly OnOff = 0;
+  static readonly Dimmer = 1;
+  static readonly Relay = 2;
+  static readonly Shutter = 3;
+  static readonly Heater = 4;
+  static readonly Pulse = 5;
+}
 
 export class DoozDeviceDef {
   public uniqueId = '';
@@ -32,7 +42,8 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
 
-  public static accessoryMap: Map<string, DoozLightAccessory> = new Map<string, DoozLightAccessory>();
+  public static accessoryLightMap: Map<string, DoozLightAccessory> = new Map<string, DoozLightAccessory>();
+  public static accessoryShuttertMap: Map<string, DoozShutterAccessory> = new Map<string, DoozShutterAccessory>();
 
   constructor(
     public readonly log: Logger,
@@ -203,7 +214,15 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
           if ('params' in message) {
             if ('level' in message.params &&
                 'address' in message.params) {
-              DoozHomebridgePlatform.accessoryMap[message.params.address].updateState(message.params.level);
+              if (DoozHomebridgePlatform.accessoryLightMap.has(message.params.address)) {
+                DoozHomebridgePlatform.accessoryLightMap[message.params.address]
+                  .updateState(message.params.level);
+              } else if (DoozHomebridgePlatform.accessoryShuttertMap.has(message.params.address)) {
+                if ('target' in message.params) {
+                  DoozHomebridgePlatform.accessoryShuttertMap[message.params.address]
+                    .updateState(message.params.level, message.params.target);
+                }
+              } // TODO find something more elegant with inheritance... this is shit
             }
           }
           // TODO : find the accessory by unicast and update characteristic level
@@ -281,7 +300,7 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
     this.webSocketClient
       .send('discover', null)
       .then((result) => {
-        //this.log.debug(result['result']['mesh']);
+        this.log.debug(result['result']['mesh']);
         //this.log.debug(result['result']['mesh'].keys);
         for (const node of Object.entries(result['result']['mesh'])) {
           if (Array.isArray(node)) {
@@ -316,6 +335,9 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
                     };
                     //this.registerDevice(macAddr, unicastAddr, outputType, eqName, roomName);
                     this.registerDevice(device);
+                    if (device.output_conf === DoozEquipementType.Shutter) {
+                      break;
+                    }
                     //this.log.debug('equip name - '+equipement['name']);
                     //this.log.debug('equip addr - '+equipement['address']);
                   }
@@ -360,7 +382,7 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
 
     // see if an accessory with the same uuid has already been registered and restored from
     // the cached devices we stored in the `configureAccessory` method above
-    const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+    let existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
     if (existingAccessory) {
       // the accessory already exists
@@ -372,9 +394,6 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
 
       // create the accessory handler for the restored accessory
       // this is imported from `platformAccessory.ts`
-      const eq: DoozLightAccessory = new DoozLightAccessory(this, existingAccessory, device);
-
-      DoozHomebridgePlatform.accessoryMap[device.unicast] = eq;
 
       // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, eg.:
       // remove platform accessories when no longer present
@@ -385,19 +404,24 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
       this.log.info('Adding new accessory:', device.displayName);
 
       // create a new accessory
-      const accessory = new this.api.platformAccessory(device.displayName, uuid);
+      existingAccessory = new this.api.platformAccessory(device.displayName, uuid);
 
       // store a copy of the device object in the `accessory.context`
       // the `context` property can be used to store any data about the accessory you may need
-      accessory.context.device = device;
-
-      // create the accessory handler for the newly create accessory
-      // this is imported from `platformAccessory.ts`
-      new DoozLightAccessory(this, accessory, device);
+      existingAccessory.context.device = device;
 
       // link the accessory to your platform
-      this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+      this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
     }
+
+    if (device.output_conf === DoozEquipementType.OnOff ||
+      device.output_conf === DoozEquipementType.Dimmer) {
+      const eq: DoozLightAccessory = new DoozLightAccessory(this, existingAccessory, device);
+      DoozHomebridgePlatform.accessoryLightMap[device.unicast] = eq;
+    } else if (device.output_conf === DoozEquipementType.Shutter) {
+      const eq: DoozShutterAccessory = new DoozShutterAccessory(this, existingAccessory, device);
+      DoozHomebridgePlatform.accessoryShuttertMap[device.unicast] = eq;
+    } // TODO find something more elegant with inheritance... this is shit
 
     setInterval(() => {
       //this.log.debug('platform timer ', this.Characteristic.Name);
@@ -413,6 +437,7 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
     //
     //      this.platform.log.debug('Triggering motionSensorOneService:', motionDetected);
     //      this.platform.log.debug('Triggering motionSensorTwoService:', !motionDetected);
-    }, (24*60*60*1000)); // once a day
+      //this.discoverDevices();
+    }, (10*60*1000)); // once per 10 min
   }
 }

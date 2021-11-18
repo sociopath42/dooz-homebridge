@@ -15,7 +15,7 @@ export class DoozLightAccessory {
    * These are just used to create a working example
    * You should implement your own code to track the state of your accessory
    */
-  private exampleStates = {
+  private lightStates = {
     On: false,
     Brightness: 100,
   };
@@ -29,7 +29,7 @@ export class DoozLightAccessory {
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'DOOZ')
-      .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
+      .setCharacteristic(this.platform.Characteristic.Model, 'Dooz light')
       .setCharacteristic(this.platform.Characteristic.SerialNumber, device.mac);
 
     // get the LightBulb service if it exists, otherwise create a new LightBulb service
@@ -50,7 +50,8 @@ export class DoozLightAccessory {
 
     // register handlers for the Brightness Characteristic
     this.service.getCharacteristic(this.platform.Characteristic.Brightness)
-      .onSet(this.setBrightness.bind(this));       // SET - bind to the 'setBrightness` method below
+      .onSet(this.setBrightness.bind(this))                // SET - bind to the `setOn` method below
+      .onGet(this.getBrightness.bind(this));               // GET - bind to the 'getBrightness` method below
 
     /**
      * Creating multiple services of the same type.
@@ -96,10 +97,10 @@ export class DoozLightAccessory {
 
   updateState(level: number) {
     const isOn = (level > 0);
-    this.exampleStates.On = isOn;
+    this.lightStates.On = isOn;
     this.service.updateCharacteristic(this.platform.Characteristic.On, isOn);
     if (isOn) {
-      this.exampleStates.Brightness = level;
+      this.lightStates.Brightness = level;
       this.service.updateCharacteristic(this.platform.Characteristic.Brightness, level);
     }
   }
@@ -114,7 +115,7 @@ export class DoozLightAccessory {
    */
   async setOn(value: CharacteristicValue) {
     // implement your own code to turn your device on/off
-    this.exampleStates.On = value as boolean;
+    this.lightStates.On = value as boolean;
     const state: string = value ? 'on' : 'off';
     this.platform.log.debug('Set Characteristic On ->', value);
     this.platform.webSocketClient
@@ -142,14 +143,14 @@ export class DoozLightAccessory {
    */
   async getOn(): Promise<CharacteristicValue> {
     // implement your own code to check if the device is on
-    let isOn = this.exampleStates.On;
+    let isOn = this.lightStates.On;
     this.platform.webSocketClient
       .send('get', {address: this.device.unicast})
       .then((result) => {
         this.platform.log.debug('get '+result.result.level+' ok '+this.device.unicast);
         isOn = (result.result.level > 0);
-        this.exampleStates.On = isOn;
-        this.exampleStates.Brightness = result.result.level as number;
+        this.lightStates.On = isOn;
+        this.lightStates.Brightness = result.result.level as number;
         this.updateState(result.result.level);
       })
       .catch((error) => {
@@ -170,18 +171,43 @@ export class DoozLightAccessory {
    */
   async setBrightness(value: CharacteristicValue) {
     // implement your own code to set the brightness
-    this.exampleStates.Brightness = value as number;
+    this.lightStates.Brightness = value as number;
     this.platform.webSocketClient
       .send('set', {address: this.device.unicast, level: value})
       .then((result) => {
         this.platform.log.debug('set '+result.level+' ok '+this.device.unicast);
-        this.exampleStates.Brightness = result.leve as number;
+        this.lightStates.Brightness = result.leve as number;
       })
       .catch((error) => {
         this.platform.log.debug('set fail '+this.device.unicast, error);
       });
 
-    this.platform.log.debug('Set Characteristic Brightness -> ', this.exampleStates.Brightness);
+    this.platform.log.debug('Set Characteristic Brightness -> ', this.lightStates.Brightness);
   }
 
+  async getBrightness(): Promise<CharacteristicValue> {
+    // implement your own code to check if the device is on
+    let brightness = this.lightStates.Brightness as number;
+    this.platform.webSocketClient
+      .send('get', {address: this.device.unicast})
+      .then((result) => {
+        this.platform.log.debug('get '+result.result.level+' ok '+this.device.unicast);
+        brightness = result.result.level as number;
+        this.lightStates.On = (result.result.level > 0);
+        this.lightStates.Brightness = result.result.level as number;
+        this.updateState(result.result.level);
+      })
+      .catch((error) => {
+        this.platform.log.debug('get fail '+this.device.unicast, error);
+      });
+
+    this.platform.log.debug('Get Characteristic Brightness ->', brightness);
+
+    // if you need to return an error to show the device as "Not Responding" in the Home app:
+    // throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+
+    return brightness;
+  }
 }
+
+
