@@ -3,12 +3,15 @@ import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { DoozLightAccessory } from './DoozLightAccessory';
 import { DoozShutterAccessory } from './DoozShutterAccessory';
+import { DoozHeaterAccessory } from './DoozHeaterAccessory';
+import { DoozSceneAccessory } from './DoozSceneAccessory';
 
 import _require2 = require('jaysonic/lib/util/constants');
 const ERR_CODES = _require2.ERR_CODES;
 const ERR_MSGS = _require2.ERR_MSGS;
 
 export class DoozEquipementType {
+  static readonly Scene = -1;
   static readonly OnOff = 0;
   static readonly Dimmer = 1;
   static readonly Relay = 2;
@@ -275,8 +278,13 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
         })
       .then((result) => {
         this.log.debug(result);
-        // TODO check if false.....
-        this.discoverDevices();      // {jsonrpc: "2.0", result: 3, id: 1}
+        if ('result' in result &&
+            'status' in result.result) {
+          this.onOoplaAuthenticated(result.result.status);
+        } else {
+          this.log.error(result);
+          // TODO tentative de reco
+        }
       })
       .catch((error) => {
         this.log.debug(error);
@@ -284,18 +292,58 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
   }
 
   onOoplaAuthenticated(message: string) {
-    if (message === 'ok') {
+    if (message === 'OK') {
       this.log.debug('authentication ok');
       this.discoverDevices();
+      this.discoverScenes();
+    } else {
+      this.log.error('authenticate failed');
+      // TODO tentative de reco
     }
   }
 
+  discoverScenes() {
+    this.webSocketClient
+      .send('discover_scenes', null)
+      .then((result) => {
+        //this.log.debug(result);
+        if ('result' in result &&
+            'scenes' in result.result) {
+          this.log.debug('discovering scenes');
+          const allScenesMaster = result.result.scenes;
+          this.log.debug(allScenesMaster);
+          for (const scenesUid in allScenesMaster) {
+            const sceneDesc = allScenesMaster[scenesUid];
+            if ('group' in sceneDesc) {
+              const sceneGroup = sceneDesc.group;
+              if ('scenes' in sceneDesc) {
+                for (const sceneIndex in sceneDesc.scenes) {
+                  const scene = sceneDesc.scenes[sceneIndex];
+                  if ('name' in scene &&
+                      'sceneId' in scene) {
+                    const sceneName = scene.name;
+                    const sceneId = scene.sceneId;
+                    const sceneAcc: DoozDeviceDef = {
+                      uniqueId: Object.keys(allScenesMaster)+':'+sceneId,
+                      mac: sceneId,
+                      unicast: sceneGroup,
+                      displayName: 'scene '+sceneName,
+                      room: '',
+                      output_conf: DoozEquipementType.Scene,
+                    };
+                    this.registerDevice(sceneAcc);
+                  }
+                }
+              }
+            }
+          }
+        }
+      })
+      .catch((error) => {
+        this.log.debug(error);
+      });
+  }
 
-  /**
-   * This is an example method showing how to register discovered accessories.
-   * Accessories must only be registered once, previously created accessories
-   * must not be registered again to prevent "duplicate UUID" errors.
-   */
   discoverDevices() {
     this.webSocketClient
       .send('discover', null)
@@ -319,7 +367,6 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
                       'name' in equipement &&
                       'address' in equipement) {
                     // --------------------------------- prendre ici les infos de l'equipement
-                    //this.log.debug(equipement);
                     const macAddr: string = nodeDef['mac_address'];
                     const unicastAddr: string = equipement['address'];
                     const outputType: number = equipement['output conf'];
@@ -333,47 +380,24 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
                       room: roomName,
                       output_conf: outputType,
                     };
-                    //this.registerDevice(macAddr, unicastAddr, outputType, eqName, roomName);
                     this.registerDevice(device);
                     if (device.output_conf === DoozEquipementType.Shutter) {
                       break;
                     }
-                    //this.log.debug('equip name - '+equipement['name']);
-                    //this.log.debug('equip addr - '+equipement['address']);
                   }
                 }
               }
             }
           }
-          //this.log.debug(node['nodes']);
-          //for (const equipement of elements['nodes']) {
-          //  this.log.debug(equipement);
-          //}
         }
-      // {jsonrpc: "2.0", result: 3, id: 1}
       })
       .catch((error) => {
         this.log.debug(error);
       });
   }
 
-  //registerDevice(macAddr: string, unicastAddr: string,
-  //  outputType: Int16, eqName: string, roomName: string) {
-  registerDevice(device: DoozDeviceDef) {
-    // EXAMPLE ONLY
-    // A real plugin you would discover accessories from the local network, cloud services
-    // or a user-defined array in the platform config.
-    //const exampleDevices = [
-    //  {
-    //    uniqueId: '0002',
-    //    displayName: 'DooblV 1 testRoom',
-    //  },
-    //  {
-    //    uniqueId: '0007',
-    //    displayName: 'Varioo 1 testRoom',
-    //  },
-    //];
 
+  registerDevice(device: DoozDeviceDef) {
 
     // generate a unique id for the accessory this should be generated from
     // something globally unique, but constant, for example, the device serial
@@ -421,6 +445,15 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
     } else if (device.output_conf === DoozEquipementType.Shutter) {
       const eq: DoozShutterAccessory = new DoozShutterAccessory(this, existingAccessory, device);
       DoozHomebridgePlatform.accessoryShuttertMap[device.unicast] = eq;
+    } else if (device.output_conf === DoozEquipementType.Heater) {
+      //const eq: DoozHeaterAccessory =
+      new DoozHeaterAccessory(this, existingAccessory, device);
+      //DoozHomebridgePlatform.accessoryShuttertMap[device.unicast] = eq;
+    }
+    if (device.output_conf === DoozEquipementType.Scene) {
+      //const eq: DoozHeaterAccessory =
+      new DoozSceneAccessory(this, existingAccessory, device);
+      //DoozHomebridgePlatform.accessoryShuttertMap[device.unicast] = eq;
     } // TODO find something more elegant with inheritance... this is shit
 
     setInterval(() => {
