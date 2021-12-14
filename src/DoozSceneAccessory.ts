@@ -1,6 +1,6 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
-import { DoozHomebridgePlatform, DoozDeviceDef } from './platform';
+import { DoozHomebridgePlatform, DoozSceneDef } from './platform';
 
 export class DoozSceneAccessory {
   private service: Service;
@@ -10,24 +10,23 @@ export class DoozSceneAccessory {
   constructor(
     private readonly platform: DoozHomebridgePlatform,
     private readonly accessory: PlatformAccessory,
-    private readonly device: DoozDeviceDef,
+    private readonly device: DoozSceneDef,
   ) {
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'DOOZ')
       .setCharacteristic(this.platform.Characteristic.Model, 'Dooz scene')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, device.uniqueId);
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, device.uniqUuid);
 
     this.service = this.accessory.getService(this.platform.Service.Switch) ||
      this.accessory.addService(this.platform.Service.Switch);
 
-    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.displayName);
+    this.service.setCharacteristic(this.platform.Characteristic.Name, device.equipmentName);
 
     // register handlers for the On/Off Characteristic
     this.service.getCharacteristic(this.platform.Characteristic.On)
       .onGet(this.getOn.bind(this))
       .onSet(this.switchEvent.bind(this));
-
   }
 
   getUnicast() {
@@ -43,7 +42,7 @@ export class DoozSceneAccessory {
     this.on = true;
 
     this.platform.webSocketClient
-      .send('set_scenario', {request: {command: 'start scenario', scenario_id: this.device.mac}})
+      .send('set_scenario', {request: {command: 'start scenario', scenario_id: this.device.sceneId}})
       .then((result) => {
         this.platform.log.debug('scenario_start');
         this.platform.log.debug(result);

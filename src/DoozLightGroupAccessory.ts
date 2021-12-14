@@ -1,15 +1,15 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
-import { DoozHomebridgePlatform, DoozDeviceDef } from './platform';
+import { DoozHomebridgePlatform, DoozGroupDef } from './platform';
 
-import { DoozLightGroupAccessory } from './DoozLightGroupAccessory';
+import { DoozLightAccessory } from './DoozLightAccessory';
 
 /**
  * Platform Accessory
  * An instance of this class is created for each accessory your platform registers
  * Each accessory may expose multiple services of different service types.
  */
-export class DoozLightAccessory {
+export class DoozLightGroupAccessory {
   private service: Service;
 
   /**
@@ -21,29 +21,27 @@ export class DoozLightAccessory {
     Brightness: 100,
   };
 
-  private groupList: Array<DoozLightGroupAccessory> = new Array<DoozLightGroupAccessory>();
+  private lightList: Array<DoozLightAccessory> = new Array<DoozLightAccessory>();
 
   constructor(
     private readonly platform: DoozHomebridgePlatform,
     private readonly accessory: PlatformAccessory,
-    private readonly device: DoozDeviceDef,
+    private readonly device: DoozGroupDef,
   ) {
 
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'DOOZ')
-      .setCharacteristic(this.platform.Characteristic.Model, 'Dooz light')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, device.uniqUuid);
+      .setCharacteristic(this.platform.Characteristic.Model, 'Dooz light group')
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, device.unicast+'::'+device.groupType);
 
     // get the LightBulb service if it exists, otherwise create a new LightBulb service
     // you can create multiple services for each accessory
-    this.service = this.accessory.getService(this.platform.Service.Lightbulb) ||
-                   this.accessory.addService(this.platform.Service.Lightbulb);
+    this.service = this.accessory.getService(this.platform.Service.Lightbulb) || this.accessory.addService(this.platform.Service.Lightbulb);
 
     // set the service name, this is what is displayed as the default name on the Home app
     // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
-    this.service.setCharacteristic(this.platform.Characteristic.Name,
-      device.room + ' - ' + device.equipmentName);
+    this.service.setCharacteristic(this.platform.Characteristic.Name, device.equipmentName);
 
     // each service must implement at-minimum the "required characteristics" for the given service type
     // see https://developers.homebridge.io/#/service/Lightbulb
@@ -58,6 +56,34 @@ export class DoozLightAccessory {
       .onSet(this.setBrightness.bind(this))                // SET - bind to the `setOn` method below
       .onGet(this.getBrightness.bind(this));               // GET - bind to the 'getBrightness` method below
 
+    /**
+     * Creating multiple services of the same type.
+     *
+     * To avoid "Cannot add a Service with the same UUID another Service without also defining a unique 'subtype' property." error,
+     * when creating multiple services of the same type, you need to use the following syntax to specify a name and subtype id:
+     * this.accessory.getService('NAME') || this.accessory.addService(this.platform.Service.Lightbulb, 'NAME', 'USER_DEFINED_SUBTYPE_ID');
+     *
+     * The USER_DEFINED_SUBTYPE must be unique to the platform accessory (if you platform exposes multiple accessories, each accessory
+     * can use the same sub type id.)
+     */
+
+    // Example: add two "motion sensor" services to the accessory
+    //const motionSensorOneService = this.accessory.getService('Motion Sensor One Name') ||
+    //  this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor One Name', 'YourUniqueIdentifier-1');
+
+    //const motionSensorTwoService = this.accessory.getService('Motion Sensor Two Name') ||
+    //  this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor Two Name', 'YourUniqueIdentifier-2');
+
+    /**
+     * Updating characteristics values asynchronously.
+     *
+     * Example showing how to update the state of a Characteristic asynchronously instead
+     * of using the `on('get')` handlers.
+     * Here we change update the motion sensor trigger states on and off every 10 seconds
+     * the `updateCharacteristic` method.
+     *
+     */
+    //    let motionDetected = false;
     setInterval(() => {
     //  this.platform.log.debug('accessory timer ', this.accessory.displayName);
     //      // EXAMPLE - inverse the trigger
@@ -72,32 +98,34 @@ export class DoozLightAccessory {
     }, 10*60*1000);
   }
 
-  updateState(level: number) {
-    const isOn = (level > 0);
-    this.lightStates.On = isOn;
-    this.service.updateCharacteristic(this.platform.Characteristic.On, isOn);
-    if (isOn) {
-      this.lightStates.Brightness = level;
-      this.service.updateCharacteristic(this.platform.Characteristic.Brightness, level);
+  addEquipement(eq: DoozLightAccessory) {
+    for (let i = 0; i < this.lightList.length; i++) {
+      if (eq.getUnicast() === this.lightList[i].getUnicast()) {
+        return;
+      }
     }
-    for (let i = 0; i < this.groupList.length; i++) {
-      this.groupList[i].updateState();
-    }
+    this.lightList.push(eq);
   }
 
-  getEquipmentName() {
-    return this.device.equipmentName;
+  updateState() {
+    let level = 0;
+    for (let i = 0; i < this.lightList.length; i++) {
+      if (this.lightList[i].getInternalOn() === true) {
+        this.lightStates.On = true;
+        level += this.lightList[i].getInternalLevel();
+      }
+    }
+    if (this.lightList.length > 0) {
+      level /= this.lightList.length;
+      this.lightStates.Brightness = level;
+      this.lightStates.On = (level > 0);
+      this.service.updateCharacteristic(this.platform.Characteristic.On, (level > 0));
+      this.service.updateCharacteristic(this.platform.Characteristic.Brightness, level);
+    }
   }
 
   getUnicast() {
     return this.device.unicast;
-  }
-
-  addToGroup(group: DoozLightGroupAccessory) {
-    if (!(this in group)) {
-      this.groupList.push(group);
-    }
-    group.addEquipement(this);
   }
 
   /**
@@ -119,49 +147,10 @@ export class DoozLightAccessory {
       });
   }
 
-  /**
-   * Handle the "GET" requests from HomeKit
-   * These are sent when HomeKit wants to know the current state of the accessory, for example, checking if a Light bulb is on.
-   *
-   * GET requests should return as fast as possbile. A long delay here will result in
-   * HomeKit being unresponsive and a bad user experience in general.
-   *
-   * If your device takes time to respond you should update the status of your device
-   * asynchronously instead using the `updateCharacteristic` method instead.
-
-   * @example
-   * this.service.updateCharacteristic(this.platform.Characteristic.On, true)
-   */
-  getInternalOn() {
-    return this.lightStates.On;
-  }
-
-  getInternalLevel() {
-    return this.lightStates.Brightness;
-  }
-
   async getOn(): Promise<CharacteristicValue> {
     // implement your own code to check if the device is on
-    let isOn = this.lightStates.On;
-    this.platform.webSocketClient
-      .send('get', {address: this.device.unicast})
-      .then((result) => {
-        this.platform.log.debug('get '+result.result.level+' ok '+this.device.unicast);
-        isOn = (result.result.level > 0);
-        this.lightStates.On = isOn;
-        this.lightStates.Brightness = result.result.level as number;
-        this.updateState(result.result.level);
-      })
-      .catch((error) => {
-        this.platform.log.debug('get fail '+this.device.unicast, error);
-      });
-
-    this.platform.log.debug('Get Characteristic On ->', isOn);
-
-    // if you need to return an error to show the device as "Not Responding" in the Home app:
-    // throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-
-    return isOn;
+    this.updateState();
+    return this.lightStates.On;
   }
 
   /**
@@ -185,27 +174,11 @@ export class DoozLightAccessory {
   }
 
   async getBrightness(): Promise<CharacteristicValue> {
-    // implement your own code to check if the device is on
-    let brightness = this.lightStates.Brightness as number;
-    this.platform.webSocketClient
-      .send('get', {address: this.device.unicast})
-      .then((result) => {
-        this.platform.log.debug('get '+result.result.level+' ok '+this.device.unicast);
-        brightness = result.result.level as number;
-        this.lightStates.On = (result.result.level > 0);
-        this.lightStates.Brightness = result.result.level as number;
-        this.updateState(result.result.level);
-      })
-      .catch((error) => {
-        this.platform.log.debug('get fail '+this.device.unicast, error);
-      });
-
-    this.platform.log.debug('Get Characteristic Brightness ->', brightness);
-
+    this.updateState();
     // if you need to return an error to show the device as "Not Responding" in the Home app:
     // throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
 
-    return brightness;
+    return this.lightStates.Brightness;
   }
 }
 

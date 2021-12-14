@@ -39,12 +39,13 @@ export class DoozHeaterAccessory {
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'DOOZ')
       .setCharacteristic(this.platform.Characteristic.Model, 'Dooz heater')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, device.mac);
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, device.uniqUuid);
 
-    // get the LightBulb service if it exists, otherwise create a new LightBulb service
-    // you can create multiple services for each accessory
     this.service = this.accessory.getService(this.platform.Service.Thermostat) ||
                    this.accessory.addService(this.platform.Service.Thermostat);
+
+    this.service.setCharacteristic(this.platform.Characteristic.Name,
+      device.room + ' - ' + device.equipmentName);
 
     // et
     //static readonly OFF = 0; // mode off

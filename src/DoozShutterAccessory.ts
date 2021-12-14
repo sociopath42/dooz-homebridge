@@ -2,6 +2,7 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { DoozHomebridgePlatform, DoozDeviceDef } from './platform';
 
+import { DoozShutterGroupAccessory } from './DoozShutterGroupAccessory';
 
 /**
  * Platform Accessory
@@ -24,6 +25,8 @@ export class DoozShutterAccessory {
     target: 100,
   };
 
+  private groupList: Array<DoozShutterGroupAccessory> = new Array<DoozShutterGroupAccessory>();
+
   constructor(
     private readonly platform: DoozHomebridgePlatform,
     private readonly accessory: PlatformAccessory,
@@ -34,7 +37,7 @@ export class DoozShutterAccessory {
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'DOOZ')
       .setCharacteristic(this.platform.Characteristic.Model, 'Dooz shutter')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, device.mac);
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, device.uniqUuid);
 
     // get the LightBulb service if it exists, otherwise create a new LightBulb service
     // you can create multiple services for each accessory
@@ -46,7 +49,7 @@ export class DoozShutterAccessory {
     this.shutterStates.state = this.platform.Characteristic.PositionState.STOPPED;
     // set the service name, this is what is displayed as the default name on the Home app
     // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
-    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.displayName);
+    this.service.setCharacteristic(this.platform.Characteristic.Name, device.room + ' - ' + device.equipmentName);
     // create handlers for required characteristics
     this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition) // level
       .onGet(this.currentPositionGet.bind(this));
@@ -57,20 +60,6 @@ export class DoozShutterAccessory {
     this.service.getCharacteristic(this.platform.Characteristic.TargetPosition) // target
       .onGet(this.targetPositionGet.bind(this))
       .onSet(this.targetPositionSet.bind(this));
-
-
-    setInterval(() => {
-    //  this.platform.log.debug('accessory timer ', this.accessory.displayName);
-    //      // EXAMPLE - inverse the trigger
-    //      motionDetected = !motionDetected;
-    //
-    //      // push the new value to HomeKit
-    //      motionSensorOneService.updateCharacteristic(this.platform.Characteristic.MotionDetected, motionDetected);
-    //      motionSensorTwoService.updateCharacteristic(this.platform.Characteristic.MotionDetected, !motionDetected);
-    //
-    //      this.platform.log.debug('Triggering motionSensorOneService:', motionDetected);
-    //      this.platform.log.debug('Triggering motionSensorTwoService:', !motionDetected);
-    }, 10*60*1000);
   }
 
   updateState(level: number, target: number) {
@@ -88,10 +77,34 @@ export class DoozShutterAccessory {
     this.service.updateCharacteristic(this.platform.Characteristic.PositionState, state);
   }
 
+
+  getEquipmentName() {
+    return this.device.equipmentName;
+  }
+
   getUnicast() {
     return this.device.unicast;
   }
 
+
+  addToGroup(group: DoozShutterGroupAccessory) {
+    if (!(this in group)) {
+      this.groupList.push(group);
+    }
+    group.addEquipement(this);
+  }
+
+  getInternalTarget(): number {
+    return this.shutterStates.target;
+  }
+
+  getInternalLevel(): number {
+    return this.shutterStates.level;
+  }
+
+  getInternalState(): number {
+    return this.shutterStates.state;
+  }
 
   async targetPositionGet(): Promise<CharacteristicValue> {
     // implement your own code to check if the device is on

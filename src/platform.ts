@@ -5,11 +5,16 @@ import { DoozLightAccessory } from './DoozLightAccessory';
 import { DoozShutterAccessory } from './DoozShutterAccessory';
 import { DoozHeaterAccessory } from './DoozHeaterAccessory';
 import { DoozSceneAccessory } from './DoozSceneAccessory';
+import { DoozLightGroupAccessory } from './DoozLightGroupAccessory';
+import { DoozShutterGroupAccessory } from './DoozShutterGroupAccessory';
 
 import _require2 = require('jaysonic/lib/util/constants');
 const ERR_CODES = _require2.ERR_CODES;
 const ERR_MSGS = _require2.ERR_MSGS;
-
+export class DoozAccessoryDef {
+  public uniqUuid = '';
+  public equipmentName = '';
+}
 export class DoozEquipementType {
   static readonly Scene = -1;
   static readonly OnOff = 0;
@@ -19,14 +24,31 @@ export class DoozEquipementType {
   static readonly Heater = 4;
   static readonly Pulse = 5;
 }
-
 export class DoozDeviceDef {
-  public uniqueId = '';
+  public uniqUuid = '';
   public mac = '';
   public unicast = '';
-  public displayName = '';
+  public equipmentName = '';
   public room = '';
   public output_conf = 0;
+}
+export class DoozGroupType {
+  static readonly DimmerGroup = 101;
+  static readonly ShutterGroup = 103;
+}
+export class DoozGroupDef {
+  public uniqUuid = '';
+  public unicast = '';
+  public equipmentName = '';
+  public room = '';
+  public groupType = 0;
+}
+export class DoozSceneDef {
+  public uniqUuid = '';
+  public sceneId = '';
+  public unicast = '';
+  public equipmentName = '';
+  public room = '';
 }
 
 import dns = require('dns');
@@ -46,7 +68,13 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
   public readonly accessories: PlatformAccessory[] = [];
 
   public static accessoryLightMap: Map<string, DoozLightAccessory> = new Map<string, DoozLightAccessory>();
-  public static accessoryShuttertMap: Map<string, DoozShutterAccessory> = new Map<string, DoozShutterAccessory>();
+  public static accessoryShutterMap: Map<string, DoozShutterAccessory> = new Map<string, DoozShutterAccessory>();
+  public static accessoryHeaterMap: Map<string, DoozHeaterAccessory> = new Map<string, DoozHeaterAccessory>();
+
+  public static accessoryLightGroupMap: Map<string, DoozLightGroupAccessory> = new Map<string, DoozLightGroupAccessory>();
+  public static accessoryShutterGroupMap: Map<string, DoozShutterGroupAccessory> = new Map<string, DoozShutterGroupAccessory>();
+
+  private connected = false;
 
   constructor(
     public readonly log: Logger,
@@ -54,17 +82,13 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
     public readonly api: API,
   ) {
     this.log.debug('Finished initializing platform:', this.config.name);
-    // When this event is fired it means Homebridge has restored all cached accessories from disk.
-    // Dynamic Platform plugins should only register new accessories after this event was fired,
-    // in order to ensure they weren't added to homebridge already. This event can also be used
-    // to start discovery of new accessories.
     this.api.on('didFinishLaunching', () => {
-      log.debug('Executed didFinishLaunching callback');
-      // run the method to discover / register your devices as accessories
-      log.debug('Leaving didFinishLaunching callback');
       this.connectOopla();
-      //      setTimeout(() => {
-      //      }, 5000);
+      setInterval(() => {
+        if (!this.connected) {
+          this.connectOopla();
+        }
+      }, (60*1000)); // once per 10 min
     });
   }
 
@@ -77,10 +101,6 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
 
     // add the restored accessory to the accessories cache so we can track if it has already been registered
     this.accessories.push(accessory);
-  }
-
-  sendToOopla() {
-    this.log.debug('send to oopla');
   }
 
   connectOopla() {
@@ -102,6 +122,7 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
     });
     jaysonic.logging.setLogger(this.log);
     this.webSocketClient.serverDisconnected(() => {
+      this.connected = false;
       this.log.debug('disconnected');
     });
     this.webSocketClient
@@ -211,26 +232,7 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
           }
         };
         this.log.info(`connected to ${host.target._url}`);
-        this.webSocketClient.subscribe('notify_state', (message) => {
-          this.log.debug('lemme handle notify_state');
-          this.log.debug(message);
-          if ('params' in message) {
-            if ('level' in message.params &&
-                'address' in message.params) {
-              if (DoozHomebridgePlatform.accessoryLightMap.has(message.params.address)) {
-                DoozHomebridgePlatform.accessoryLightMap[message.params.address]
-                  .updateState(message.params.level);
-              } else if (DoozHomebridgePlatform.accessoryShuttertMap.has(message.params.address)) {
-                if ('target' in message.params) {
-                  DoozHomebridgePlatform.accessoryShuttertMap[message.params.address]
-                    .updateState(message.params.level, message.params.target);
-                }
-              } // TODO find something more elegant with inheritance... this is shit
-            }
-          }
-          // TODO : find the accessory by unicast and update characteristic level
-          // {jsonrpc: "2.0", method: "notification", params: []}
-        });
+        this.webSocketClient.subscribe('notify_state', this.onNotifyState);
         this.onOoplaConnected();
       })
       .catch((error) => {
@@ -243,18 +245,42 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
 
   }
 
+  onNotifyState(message) {
+    //this.log.debug('lemme handle notify_state');
+    //this.log.debug(message);
+    if ('params' in message) {
+      if ('level' in message.params &&
+          'address' in message.params) {
+        if (DoozHomebridgePlatform.accessoryLightMap.has(message.params.address)) {
+          DoozHomebridgePlatform.accessoryLightMap.get(message.params.address)!
+            .updateState(message.params.level);
+        } else if (DoozHomebridgePlatform.accessoryShutterMap.has(message.params.address)) {
+          if ('target' in message.params) {
+            DoozHomebridgePlatform.accessoryShutterMap.get(message.params.address)!
+              .updateState(message.params.level, message.params.target);
+          }
+        } // TODO find something more elegant with inheritance... this is shit
+      }
+    }
+    // TODO : find the accessory by unicast and update characteristic level
+    // {jsonrpc: "2.0", method: "notification", params: []}
+  }
+
   onOoplaSocketError() {
   //  this.log.debug('ERROR');
+    this.connected = false;
     this.log.debug('error');
   }
 
   onOoplaConnected() {
     this.log.debug('connected');
+    this.connected = true;
     this.authenticateFireBase();
     // this.log.debug('connected');
   }
 
   onOoplaDisconnected() {
+    this.connected = false;
     this.log.debug('disconnected');
   }
 
@@ -288,6 +314,8 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
       })
       .catch((error) => {
         this.log.debug(error);
+        this.webSocketClient.end();
+        this.connected = false;
       });
   }
 
@@ -295,11 +323,15 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
     if (message === 'OK') {
       this.log.debug('authentication ok');
       this.discoverDevices();
-      this.discoverScenes();
     } else {
       this.log.error('authenticate failed');
       // TODO tentative de reco
     }
+  }
+
+  onDevicesDiscovered() {
+    this.discoverScenes();
+    this.discoverGroups();
   }
 
   discoverScenes() {
@@ -323,16 +355,116 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
                       'sceneId' in scene) {
                     const sceneName = scene.name;
                     const sceneId = scene.sceneId;
-                    const sceneAcc: DoozDeviceDef = {
-                      uniqueId: Object.keys(allScenesMaster)+':'+sceneId,
-                      mac: sceneId,
+                    const sceneAcc: DoozSceneDef = {
+                      uniqUuid: sceneGroup+'::'+sceneId,
+                      sceneId: sceneId,
                       unicast: sceneGroup,
-                      displayName: 'scene '+sceneName,
+                      equipmentName: sceneName,
                       room: '',
-                      output_conf: DoozEquipementType.Scene,
                     };
-                    this.registerDevice(sceneAcc);
+                    const accessory = this.registerScene(sceneAcc);
+                    new DoozSceneAccessory(this, accessory, sceneAcc);
                   }
+                }
+              }
+            }
+          }
+        }
+      })
+      .catch((error) => {
+        this.log.debug(error);
+      });
+  }
+
+  discoverGroups() {
+    this.webSocketClient
+      .send('discover_groups', null)
+      .then((result) => {
+        this.log.debug(result);
+        if ('result' in result &&
+            'groups' in result.result) {
+          this.log.debug('discovering groups');
+          const allgroups = result.result.groups;
+          //  this.log.debug(allScenesMaster);
+          for (const groupName in allgroups) {
+            const groupDef = allgroups[groupName];
+            //console.log(groupDef);
+            if ('groupAddress' in groupDef) {
+              console.log(groupName+' - addr: '+groupDef.groupAddress);
+
+              const groupAddress = groupDef.groupAddress;
+              if ('id' in groupDef) {
+                //const groupId = groupDef.id;
+                if ('equipments' in groupDef) {
+                  //console.log(groupDef.equipments);
+                  console.log(groupDef.equipments);
+                  // determine if is a shutter or light group
+                  // and register it
+                  if (Array.isArray(groupDef.equipments) &&
+                          groupDef.equipments.length > 0) {
+                    const eqAddr: number = groupDef.equipments[0]['nodeId'] + 1;
+                    const eqNode: string = eqAddr.toString(16).padStart(4, '0');
+                    let eqType: number;
+                    if (DoozHomebridgePlatform.accessoryShutterMap.has(eqNode)) {
+                      eqType = DoozGroupType.ShutterGroup;
+                    } else {
+                      eqType = DoozGroupType.DimmerGroup;
+                    }
+                    const groupAcc: DoozGroupDef = {
+                      uniqUuid: groupAddress+'::'+eqType,
+                      unicast: groupAddress,
+                      equipmentName: groupName,
+                      room: '',
+                      groupType: eqType,
+                    };
+                    const accessory = this.registerGroup(groupAcc);
+                    if (eqType === DoozGroupType.DimmerGroup) {
+                      const group = new DoozLightGroupAccessory(this, accessory, groupAcc);
+                      for (const groupEquipement of groupDef.equipments) {
+                        if ('name' in groupEquipement &&
+                          'nodeId' in groupEquipement) {
+                          for (const savedAccessory of DoozHomebridgePlatform.accessoryLightMap.values()) {
+                            if ((savedAccessory.getEquipmentName() === groupEquipement.name) &&
+                                     (savedAccessory.getUnicast().toUpperCase() ===
+                                      (groupEquipement.nodeId + 1).toString(16).toUpperCase().padStart(4, '0') ||
+                                      savedAccessory.getUnicast().toUpperCase() ===
+                                      (groupEquipement.nodeId + 2).toString(16).toUpperCase().padStart(4, '0'))) {
+                              console.log('Match saved '+savedAccessory.getEquipmentName() + ':'+savedAccessory.getUnicast()+
+                                            ' in grp '+groupEquipement.name+':'+groupEquipement.nodeId.toString(16).padStart(4, '0'));
+                              savedAccessory.addToGroup(group);
+                            }
+                          }
+                        }
+                      }
+                    } else {
+                      const group = new DoozShutterGroupAccessory(this, accessory, groupAcc);
+                      for (const groupEquipement of groupDef.equipments) {
+                        if ('name' in groupEquipement &&
+                          'nodeId' in groupEquipement) {
+                          for (const savedAccessory of DoozHomebridgePlatform.accessoryShutterMap.values()) {
+                            if ((savedAccessory.getEquipmentName() === groupEquipement.name) &&
+                                     (savedAccessory.getUnicast().toUpperCase() ===
+                                      (groupEquipement.nodeId + 1).toString(16).toUpperCase().padStart(4, '0') ||
+                                      savedAccessory.getUnicast().toUpperCase() ===
+                                      (groupEquipement.nodeId + 2).toString(16).toUpperCase().padStart(4, '0'))) {
+                              console.log('Match saved '+savedAccessory.getEquipmentName() + ':'+savedAccessory.getUnicast()+
+                                            ' in grp '+groupEquipement.name+':'+groupEquipement.nodeId.toString(16).padStart(4, '0'));
+                              savedAccessory.addToGroup(group);
+                            }
+                          }
+                        }
+                      }
+
+                    }
+                  }
+
+
+
+
+
+
+
+
                 }
               }
             }
@@ -359,30 +491,56 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
               if ('conf state' in nodeDef && nodeDef['conf state'] === 'CONFIGURED' &&
                   'nodes' in nodeDef && Array.isArray(nodeDef['nodes'])) {
                 // --------------------------------- prendre ici les infos du noeud
-                //this.log.debug('discovered');
-                //this.log.debug('mac '+nodeDef['mac_address']);
-                for (const nodeIndex in nodeDef['nodes']) {
-                  const equipement = nodeDef['nodes'][nodeIndex];
-                  if ('output conf' in equipement &&
-                      'name' in equipement &&
-                      'address' in equipement) {
+                this.log.debug('discovered');
+                this.log.debug('mac '+nodeDef['mac_address']);
+                console.log(nodeDef);
+                if ('name' in nodeDef &&
+                    nodeDef['name'] !== null &&
+                    nodeDef['name'] !== 'Unknown module name' &&
+                    'mac_address' in nodeDef &&
+                    nodeDef['mac_address'] !== null
+                ) {
+                  for (const nodeIndex in nodeDef['nodes']) {
+                    const equipement = nodeDef['nodes'][nodeIndex];
+
+                    if ('output conf' in equipement &&
+                      equipement.output_conf !== null &&
+                      'address' in equipement &&
+                      equipement.address !== null &&
+                      'room' in equipement &&
+                      equipement.room !== null &&
+                      'name' in equipement.room &&
+                      equipement.room.name !== null) {
                     // --------------------------------- prendre ici les infos de l'equipement
-                    const macAddr: string = nodeDef['mac_address'];
-                    const unicastAddr: string = equipement['address'];
-                    const outputType: number = equipement['output conf'];
-                    const eqName: string = equipement['name'];
-                    const roomName = equipement['room']['name'];
-                    const device: DoozDeviceDef = {
-                      uniqueId: macAddr+'::'+unicastAddr,
-                      unicast: unicastAddr,
-                      mac: macAddr,
-                      displayName: eqName+' - '+roomName,
-                      room: roomName,
-                      output_conf: outputType,
-                    };
-                    this.registerDevice(device);
-                    if (device.output_conf === DoozEquipementType.Shutter) {
-                      break;
+                      const macAddr: string = nodeDef['mac_address'];
+                      const unicastAddr: string = equipement['address'];
+                      const outputType: number = equipement['output conf'];
+                      const eqName: string = equipement['name'];
+                      const roomName = equipement['room']['name'];
+                      const device: DoozDeviceDef = {
+                        uniqUuid: macAddr+'::'+unicastAddr,
+                        unicast: unicastAddr,
+                        mac: macAddr,
+                        equipmentName: eqName,
+                        room: roomName,
+                        output_conf: outputType,
+                      };
+                      const accessory = this.registerDevice(device);
+                      if (device.output_conf === DoozEquipementType.OnOff ||
+                          device.output_conf === DoozEquipementType.Relay ||
+                          device.output_conf === DoozEquipementType.Dimmer) {
+                        const eq: DoozLightAccessory = new DoozLightAccessory(this, accessory, device);
+                        DoozHomebridgePlatform.accessoryLightMap.set(device.unicast, eq);
+                      } else if (device.output_conf === DoozEquipementType.Shutter) {
+                        const eq: DoozShutterAccessory = new DoozShutterAccessory(this, accessory, device);
+                        DoozHomebridgePlatform.accessoryShutterMap.set(device.unicast, eq);
+                      } else if (device.output_conf === DoozEquipementType.Heater) {
+                        const eq: DoozHeaterAccessory = new DoozHeaterAccessory(this, accessory, device);
+                        DoozHomebridgePlatform.accessoryHeaterMap.set(device.unicast, eq);
+                      }
+                      if (device.output_conf === DoozEquipementType.Shutter as number) {
+                        break;
+                      }
                     }
                   }
                 }
@@ -390,87 +548,52 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
             }
           }
         }
+        this.onDevicesDiscovered();
       })
       .catch((error) => {
         this.log.debug(error);
       });
   }
 
+  registerDevice(device: DoozDeviceDef): PlatformAccessory {
+    const acc: DoozAccessoryDef = {
+      uniqUuid : device.uniqUuid,
+      equipmentName : device.equipmentName,
+    };
 
-  registerDevice(device: DoozDeviceDef) {
+    return this.registerAccessory(acc, device);
+  }
 
-    // generate a unique id for the accessory this should be generated from
-    // something globally unique, but constant, for example, the device serial
-    // number or MAC address
-    const uuid = this.api.hap.uuid.generate(device.uniqueId);
+  registerGroup(group: DoozGroupDef): PlatformAccessory {
+    const acc: DoozAccessoryDef = {
+      uniqUuid : group.uniqUuid,
+      equipmentName : group.equipmentName,
+    };
+    return this.registerAccessory(acc, group);
+  }
 
-    // see if an accessory with the same uuid has already been registered and restored from
-    // the cached devices we stored in the `configureAccessory` method above
+  registerScene(scene: DoozSceneDef): PlatformAccessory {
+    const acc: DoozAccessoryDef = {
+      uniqUuid : scene.uniqUuid,
+      equipmentName : scene.equipmentName,
+    };
+    return this.registerAccessory(acc, scene);
+  }
+
+  registerAccessory(accessory: DoozAccessoryDef, device: object): PlatformAccessory {
+    const uuid = this.api.hap.uuid.generate(accessory.uniqUuid);
     let existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
     if (existingAccessory) {
-      // the accessory already exists
       this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
-
-      // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. eg.:
-      // existingAccessory.context.device = device;
-      // this.api.updatePlatformAccessories([existingAccessory]);
-
-      // create the accessory handler for the restored accessory
-      // this is imported from `platformAccessory.ts`
-
-      // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, eg.:
-      // remove platform accessories when no longer present
-      // this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
-      // this.log.info('Removing existing accessory from cache:', existingAccessory.displayName);
     } else {
-      // the accessory does not yet exist, so we need to create it
-      this.log.info('Adding new accessory:', device.displayName);
+      this.log.info('Adding new accessory:', accessory.equipmentName);
 
-      // create a new accessory
-      existingAccessory = new this.api.platformAccessory(device.displayName, uuid);
-
-      // store a copy of the device object in the `accessory.context`
-      // the `context` property can be used to store any data about the accessory you may need
+      existingAccessory = new this.api.platformAccessory(accessory.equipmentName, uuid);
       existingAccessory.context.device = device;
-
-      // link the accessory to your platform
       this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
     }
 
-    if (device.output_conf === DoozEquipementType.OnOff ||
-      device.output_conf === DoozEquipementType.Dimmer) {
-      const eq: DoozLightAccessory = new DoozLightAccessory(this, existingAccessory, device);
-      DoozHomebridgePlatform.accessoryLightMap[device.unicast] = eq;
-    } else if (device.output_conf === DoozEquipementType.Shutter) {
-      const eq: DoozShutterAccessory = new DoozShutterAccessory(this, existingAccessory, device);
-      DoozHomebridgePlatform.accessoryShuttertMap[device.unicast] = eq;
-    } else if (device.output_conf === DoozEquipementType.Heater) {
-      //const eq: DoozHeaterAccessory =
-      new DoozHeaterAccessory(this, existingAccessory, device);
-      //DoozHomebridgePlatform.accessoryShuttertMap[device.unicast] = eq;
-    }
-    if (device.output_conf === DoozEquipementType.Scene) {
-      //const eq: DoozHeaterAccessory =
-      new DoozSceneAccessory(this, existingAccessory, device);
-      //DoozHomebridgePlatform.accessoryShuttertMap[device.unicast] = eq;
-    } // TODO find something more elegant with inheritance... this is shit
-
-    setInterval(() => {
-      //this.log.debug('platform timer ', this.Characteristic.Name);
-      //this.webSocketClient.end();
-      //this.connectOopla();
-      //this.webSocket.send('Date.now');
-      //      // EXAMPLE - inverse the trigger
-    //      motionDetected = !motionDetected;
-    //
-    //      // push the new value to HomeKit
-    //      motionSensorOneService.updateCharacteristic(this.platform.Characteristic.MotionDetected, motionDetected);
-    //      motionSensorTwoService.updateCharacteristic(this.platform.Characteristic.MotionDetected, !motionDetected);
-    //
-    //      this.platform.log.debug('Triggering motionSensorOneService:', motionDetected);
-    //      this.platform.log.debug('Triggering motionSensorTwoService:', !motionDetected);
-      //this.discoverDevices();
-    }, (10*60*1000)); // once per 10 min
+    return existingAccessory;
   }
 }
