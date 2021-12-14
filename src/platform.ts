@@ -390,14 +390,14 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
             const groupDef = allgroups[groupName];
             //console.log(groupDef);
             if ('groupAddress' in groupDef) {
-              console.log(groupName+' - addr: '+groupDef.groupAddress);
+              //console.log(groupName+' - addr: '+groupDef.groupAddress);
 
               const groupAddress = groupDef.groupAddress;
               if ('id' in groupDef) {
                 //const groupId = groupDef.id;
                 if ('equipments' in groupDef) {
                   //console.log(groupDef.equipments);
-                  console.log(groupDef.equipments);
+                  //console.log(groupDef.equipments);
                   // determine if is a shutter or light group
                   // and register it
                   if (Array.isArray(groupDef.equipments) &&
@@ -429,8 +429,8 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
                                       (groupEquipement.nodeId + 1).toString(16).toUpperCase().padStart(4, '0') ||
                                       savedAccessory.getUnicast().toUpperCase() ===
                                       (groupEquipement.nodeId + 2).toString(16).toUpperCase().padStart(4, '0'))) {
-                              console.log('Match saved '+savedAccessory.getEquipmentName() + ':'+savedAccessory.getUnicast()+
-                                            ' in grp '+groupEquipement.name+':'+groupEquipement.nodeId.toString(16).padStart(4, '0'));
+                              //console.log('Match saved '+savedAccessory.getEquipmentName() + ':'+savedAccessory.getUnicast()+
+                              //              ' in grp '+groupEquipement.name+':'+groupEquipement.nodeId.toString(16).padStart(4, '0'));
                               savedAccessory.addToGroup(group);
                             }
                           }
@@ -447,8 +447,8 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
                                       (groupEquipement.nodeId + 1).toString(16).toUpperCase().padStart(4, '0') ||
                                       savedAccessory.getUnicast().toUpperCase() ===
                                       (groupEquipement.nodeId + 2).toString(16).toUpperCase().padStart(4, '0'))) {
-                              console.log('Match saved '+savedAccessory.getEquipmentName() + ':'+savedAccessory.getUnicast()+
-                                            ' in grp '+groupEquipement.name+':'+groupEquipement.nodeId.toString(16).padStart(4, '0'));
+                              //console.log('Match saved '+savedAccessory.getEquipmentName() + ':'+savedAccessory.getUnicast()+
+                              //              ' in grp '+groupEquipement.name+':'+groupEquipement.nodeId.toString(16).padStart(4, '0'));
                               savedAccessory.addToGroup(group);
                             }
                           }
@@ -493,7 +493,7 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
                 // --------------------------------- prendre ici les infos du noeud
                 this.log.debug('discovered');
                 this.log.debug('mac '+nodeDef['mac_address']);
-                console.log(nodeDef);
+                //console.log(nodeDef);
                 if ('name' in nodeDef &&
                     nodeDef['name'] !== null &&
                     nodeDef['name'] !== 'Unknown module name' &&
