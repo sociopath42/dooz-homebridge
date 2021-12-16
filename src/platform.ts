@@ -509,6 +509,7 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
                       equipement.address !== null &&
                       'room' in equipement &&
                       equipement.room !== null &&
+                      equipement.room !== 'unknown module location' &&
                       'name' in equipement.room &&
                       equipement.room.name !== null) {
                     // --------------------------------- prendre ici les infos de l'equipement
