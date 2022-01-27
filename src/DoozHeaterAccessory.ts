@@ -2,14 +2,14 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { DoozHomebridgePlatform, DoozDeviceDef } from './platform';
 
-export declare class DoozHeatingModes {
+export class DoozHeatingModes {
   static readonly PRESENT = 0;
   static readonly ABSENT = 1;
   static readonly NIGHT = 2;
   static readonly FROSTFREE = 3;
   static readonly OFF = 4;
   static readonly AUTO = 5;
-  constructor();
+//  constructor();
 }
 
 /**
@@ -87,41 +87,86 @@ export class DoozHeaterAccessory {
       .onSet(this.setTemperatureDisplayUnits.bind(this));
 
 
-    this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, this.heaterStates.currentMode);
-    this.service.updateCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState, this.heaterStates.targetHeatingState);
-    this.service.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, this.heaterStates.currentTemperature);
-    this.service.updateCharacteristic(this.platform.Characteristic.TargetTemperature, this.heaterStates.targetTemperature);
-    this.service.updateCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits, this.heaterStates.unit);
+    //this.getCurrentHeatingState();
+    //this.getCurrentTemperature();
+    //this.getTargetTemperature();
+    //
+    //this.service.updateCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits, this.heaterStates.unit);
+
     setInterval(() => {
+      //const payload = (0x01F << 9).toString(16).padStart(4, '0').toLocaleUpperCase();
+      //const sensorServerAddr = (Number('0x'+this.device.unicast) + 3).toString(16).padStart(4, '0').toLocaleUpperCase();
+      //this.platform.log.debug('------------------getCurrentTemperature addr', sensorServerAddr, 'payload', payload);
+      //this.platform.webSocketClient
+      //  .send('set', {address: sensorServerAddr, raw: payload})
+      //  .then((result) => {
+      //    this.platform.log.debug(result);
+      //    this.platform.log.debug('get '+result.result.level+' ok '+this.device.unicast);
+      //    if ('level' in result.result) {
+      //      this.heaterStates.currentTemperature = result.result.raw / 10.0;
+      //      this.service.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, this.heaterStates.currentTemperature);
+      //    }
+      //  })
+      //  .catch((error) => {
+      //    this.platform.log.error('getCurrentTemperature '+this.device.unicast, error);
+      //  });
     //  this.platform.log.debug('accessory timer ', this.accessory.displayName);
-    }, 10*60*1000);
+    }, 1*60*1000);
   }
 
   getUnicast() {
     return this.device.unicast;
   }
 
+  async updateState(rawString: string) {
+    if (rawString === '8000' || rawString === '7FFF') {
+      this.platform.log.debug('relay state', (rawString === '8000')?'open':'closed');
+      return;
+    }
+    console.log('0x'+ rawString);
+    const raw = Number('0x'+ rawString);
+    const payloadCmd = (raw & 0xE000) >> 13;
+    this.platform.log.debug('------------------updateState');
+    const payloadTemp = (raw & 0x1FC0) >> 6;
+    const payloadModeId = (raw & 0x003F);
+    const targetTemp = payloadTemp / 2.0;
+    console.log(payloadCmd);
+    console.log(payloadTemp);
+    console.log(payloadModeId);
+    console.log(this.heaterStates.targetTemperature);
+    const heatingSt = payloadModeId === DoozHeatingModes.OFF ?
+      this.platform.Characteristic.CurrentHeatingCoolingState.OFF :
+      this.platform.Characteristic.CurrentHeatingCoolingState.HEAT;
+
+    if (payloadCmd === 0x04 ||
+        payloadCmd === 0x00) {
+      if (this.heaterStates.heatingState !== heatingSt) {
+        this.heaterStates.heatingState = heatingSt;
+        this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, this.heaterStates.heatingState);
+      }
+    }
+    if (payloadCmd === 0x04) {
+      if (this.heaterStates.targetTemperature !== targetTemp) {
+        this.heaterStates.targetTemperature = targetTemp;
+        this.service.updateCharacteristic(this.platform.Characteristic.TargetTemperature, this.heaterStates.targetTemperature);
+      }
+    }
+  }
 
   async getCurrentHeatingState(): Promise<CharacteristicValue> {
+    this.platform.log.debug('------------------getCurrentHeatingState');
     const payload = 4 << 13; // Dooz magic language.... do not touch this
     this.platform.webSocketClient
-      .send('set', {address: this.device.unicast, raw: payload})
+      .send('set', {address: this.device.unicast, raw: payload.toString(16).padStart(4, '0').toLocaleUpperCase()})
       .then((result) => {
-        this.platform.log.debug('get '+result.result.level+' ok '+this.device.unicast);
+        this.platform.log.debug(result);
+        this.platform.log.debug('get '+result.result.raw+' ok '+this.device.unicast);
         if (!('raw' in result.result)) {
-          const raw = result.result.raw;
-          const payloadTemp = (raw & 0x1FC0) >> 6;
-          const payloadModeId = (raw & 0x003F);
-          this.heaterStates.targetTemperature = payloadTemp / 2.0;
-          this.heaterStates.heatingState = payloadModeId === DoozHeatingModes.OFF ?
-            this.platform.Characteristic.CurrentHeatingCoolingState.OFF :
-            this.platform.Characteristic.CurrentHeatingCoolingState.HEAT;
-          this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, this.heaterStates.heatingState);
-          this.service.updateCharacteristic(this.platform.Characteristic.TargetTemperature, this.heaterStates.targetTemperature);
+          this.updateState(result.result.level);
         }
       })
       .catch((error) => {
-        this.platform.log.debug('getCurrentHeatingState fail '+this.device.unicast, error);
+        this.platform.log.error('getCurrentHeatingState fail '+this.device.unicast, error);
       });
     this.platform.log.debug('Get current heating state ->', this.heaterStates.heatingState);
     //this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, this.heaterStates.heatingState);
@@ -143,39 +188,32 @@ export class DoozHeaterAccessory {
       value = this.platform.Characteristic.CurrentHeatingCoolingState.HEAT;
       doozHeatingMode = DoozHeatingModes.PRESENT;
     }
-    this.heaterStates.targetHeatingState = value;
-    this.service.updateCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState, this.heaterStates.targetHeatingState);
+    if (value !== this.heaterStates.targetHeatingState) {
+      this.heaterStates.targetHeatingState = value;
+      this.service.updateCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState, this.heaterStates.targetHeatingState);
+    }
 
     this.platform.webSocketClient
-      .send('set', {address: this.device.unicast, raw: doozHeatingMode})
+      .send('set', {address: this.device.unicast, raw: doozHeatingMode.toString(16).padStart(4, '0').toLocaleUpperCase()})
       .then((result) => {
+        this.platform.log.debug(result);
         if (!('raw' in result.result)) {
           this.platform.log.debug('get '+result.result.raw+' ok '+this.device.unicast);
-          this.heaterStates.heatingState = result.result.raw === DoozHeatingModes.OFF ?
+          const heatingSt = result.result.raw === DoozHeatingModes.OFF ?
             this.platform.Characteristic.CurrentHeatingCoolingState.OFF :
             this.platform.Characteristic.CurrentHeatingCoolingState.HEAT;
-          this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, this.heaterStates.heatingState);
+          if (heatingSt !== this.heaterStates.heatingState) {
+            this.heaterStates.heatingState = heatingSt;
+            this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, this.heaterStates.heatingState);
+          }
         }
       })
       .catch((error) => {
-        this.platform.log.debug('set mode fail '+this.device.unicast, error);
+        this.platform.log.error('set mode fail '+this.device.unicast, error);
       });
   }
 
   async getCurrentTemperature(): Promise<CharacteristicValue> {
-    const payload = 0x3F00;
-    this.platform.webSocketClient
-      .send('set', {address: this.device.unicast+3, raw: payload})
-      .then((result) => {
-        this.platform.log.debug('get '+result.result.level+' ok '+this.device.unicast);
-        if ('raw' in result.result) {
-          this.heaterStates.currentTemperature = result.result.raw / 10.0;
-          this.service.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, this.heaterStates.currentTemperature);
-        }
-      })
-      .catch((error) => {
-        this.platform.log.debug('getCurrentTemperature '+this.device.unicast, error);
-      });
     this.platform.log.debug('Get current temperature ->', this.heaterStates.currentTemperature);
     return this.heaterStates.currentTemperature;
   }
@@ -186,29 +224,34 @@ export class DoozHeaterAccessory {
   }
 
   setTargetTemperature(value) {
-    this.heaterStates.targetTemperature = value;
-    this.service.updateCharacteristic(this.platform.Characteristic.TargetTemperature, this.heaterStates.targetTemperature);
+    this.platform.log.debug('------------------setTargetTemperature');
+    if (value !== this.heaterStates.targetTemperature) {
+      this.heaterStates.targetTemperature = value;
+      this.service.updateCharacteristic(this.platform.Characteristic.TargetTemperature, this.heaterStates.targetTemperature);
+    }
     const doozTemperatureOverride = Math.round(value * 2.0);
     const payload = (3 << 13) | (doozTemperatureOverride << 6);
 
     this.platform.webSocketClient
-      .send('set', {address: this.device.unicast, raw: payload})
+      .send('set', {address: this.device.unicast, level: payload.toString(16).padStart(4, '0').toLocaleUpperCase()})
       .then((result) => {
+        this.platform.log.debug(result);
         this.platform.log.debug('set '+result.result.level+' ok '+this.device.unicast);
-        if ('raw' in result.result) {
+        if ('level' in result.result) {
           const raw = result.result.raw;
-          const payloadTemp = (raw & 0x1FC0) >> 6;
-          const payloadModeId = (raw & 0x003F);
-          this.heaterStates.targetTemperature = payloadTemp / 2.0;
-          this.heaterStates.heatingState = payloadModeId === DoozHeatingModes.OFF ?
-            this.platform.Characteristic.CurrentHeatingCoolingState.OFF :
-            this.platform.Characteristic.CurrentHeatingCoolingState.HEAT;
-          this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, this.heaterStates.heatingState);
-          this.service.updateCharacteristic(this.platform.Characteristic.TargetTemperature, this.heaterStates.targetTemperature);
+          this.updateState(raw);
+          //const payloadTemp = (raw & 0x1FC0) >> 6;
+          //const payloadModeId = (raw & 0x003F);
+          //this.heaterStates.targetTemperature = payloadTemp / 2.0;
+          //this.heaterStates.heatingState = payloadModeId === DoozHeatingModes.OFF ?
+          //  this.platform.Characteristic.CurrentHeatingCoolingState.OFF :
+          //  this.platform.Characteristic.CurrentHeatingCoolingState.HEAT;
+          //this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, this.heaterStates.heatingState);
+          //this.service.updateCharacteristic(this.platform.Characteristic.TargetTemperature, this.heaterStates.targetTemperature);
         }
       })
       .catch((error) => {
-        this.platform.log.debug('setTargetTemperature fail '+this.device.unicast, error);
+        this.platform.log.error('setTargetTemperature fail '+this.device.unicast, error);
       });
   }
 
