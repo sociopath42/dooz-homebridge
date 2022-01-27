@@ -123,17 +123,17 @@ export class DoozHeaterAccessory {
       this.platform.log.debug('relay state', (rawString === '8000')?'open':'closed');
       return;
     }
-    console.log('0x'+ rawString);
+    //console.log('0x'+ rawString);
     const raw = Number('0x'+ rawString);
     const payloadCmd = (raw & 0xE000) >> 13;
     this.platform.log.debug('------------------updateState');
     const payloadTemp = (raw & 0x1FC0) >> 6;
     const payloadModeId = (raw & 0x003F);
     const targetTemp = payloadTemp / 2.0;
-    console.log(payloadCmd);
-    console.log(payloadTemp);
-    console.log(payloadModeId);
-    console.log(this.heaterStates.targetTemperature);
+    //console.log(payloadCmd);
+    //console.log(payloadTemp);
+    //console.log(payloadModeId);
+    //console.log(this.heaterStates.targetTemperature);
     const heatingSt = payloadModeId === DoozHeatingModes.OFF ?
       this.platform.Characteristic.CurrentHeatingCoolingState.OFF :
       this.platform.Characteristic.CurrentHeatingCoolingState.HEAT;
