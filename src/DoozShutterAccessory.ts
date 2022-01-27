@@ -69,12 +69,18 @@ export class DoozShutterAccessory {
     } else if (target < level) {
       state = this.platform.Characteristic.PositionState.DECREASING;
     }
-    this.shutterStates.state = state;
-    this.shutterStates.level = level;
-    this.shutterStates.target = target;
-    this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, level);
-    this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, target);
-    this.service.updateCharacteristic(this.platform.Characteristic.PositionState, state);
+    if (state !== this.shutterStates.state) {
+      this.shutterStates.state = state;
+      this.service.updateCharacteristic(this.platform.Characteristic.PositionState, state);
+    }
+    if (level !== this.shutterStates.level) {
+      this.shutterStates.level = level;
+      this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, level);
+    }
+    if (target !== this.shutterStates.target) {
+      this.shutterStates.target = target;
+      this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, target);
+    }
   }
 
 
@@ -121,7 +127,7 @@ export class DoozShutterAccessory {
         this.platform.log.debug('get fail '+this.device.unicast, error);
       });
 
-    this.platform.log.debug('Get current position level ->', this.shutterStates.level);
+    //this.platform.log.debug('Get current position level ->', this.shutterStates.level);
 
     return this.shutterStates.target;
   }
@@ -131,7 +137,7 @@ export class DoozShutterAccessory {
     this.platform.webSocketClient
       .send('get', {address: this.device.unicast})
       .then((result) => {
-        this.platform.log.debug('get '+result.result.level+' ok '+this.device.unicast);
+        //this.platform.log.debug('get '+result.result.level+' ok '+this.device.unicast);
         if (!('target' in result.result)) {
           result.result.target = result.result.level;
         }
@@ -141,7 +147,7 @@ export class DoozShutterAccessory {
         this.platform.log.debug('get fail '+this.device.unicast, error);
       });
 
-    this.platform.log.debug('Get current position level ->', this.shutterStates.level);
+    //this.platform.log.debug('Get current position level ->', this.shutterStates.level);
 
     return this.shutterStates.level;
   }
@@ -155,13 +161,13 @@ export class DoozShutterAccessory {
           result.result.target = result.result.level;
         }
         this.updateState(result.result.level, result.result.target);
-        this.platform.log.debug('get state '+this.shutterStates.state+' ok '+this.device.unicast);
+        //this.platform.log.debug('get state '+this.shutterStates.state+' ok '+this.device.unicast);
       })
       .catch((error) => {
         this.platform.log.debug('get fail '+this.device.unicast, error);
       });
 
-    this.platform.log.debug('Get state ->', this.shutterStates.state);
+    //this.platform.log.debug('Get state ->', this.shutterStates.state);
 
     // if you need to return an error to show the device as "Not Responding" in the Home app:
     // throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
@@ -178,13 +184,13 @@ export class DoozShutterAccessory {
     this.platform.webSocketClient
       .send('set', {address: this.device.unicast, level: value})
       .then((result) => {
-        this.platform.log.debug('set '+result.level+' ok '+this.device.unicast);
+        //this.platform.log.debug('set '+result.level+' ok '+this.device.unicast);
         this.shutterStates.target = result.level as number;
       })
       .catch((error) => {
         this.platform.log.debug('set fail '+this.device.unicast, error);
       });
 
-    this.platform.log.debug('Set target position -> ', this.shutterStates.target);
+    //this.platform.log.debug('Set target position -> ', this.shutterStates.target);
   }
 }
