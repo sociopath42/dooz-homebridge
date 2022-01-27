@@ -245,9 +245,10 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
 
   }
 
+
   onNotifyState(message) {
-    //this.log.debug('lemme handle notify_state');
-    //this.log.debug(message);
+    //console.log('lemme handle notify_state');
+    //console.log(message);
     if ('params' in message) {
       if ('level' in message.params &&
           'address' in message.params) {
@@ -259,9 +260,19 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
             DoozHomebridgePlatform.accessoryShutterMap.get(message.params.address)!
               .updateState(message.params.level, message.params.target);
           }
+        } else if (DoozHomebridgePlatform.accessoryHeaterMap.has(message.params.address)) {
+          if ('params' in message) {
+            if ('level' in message.params) {
+                DoozHomebridgePlatform.accessoryHeaterMap.get(message.params.address)!
+                  .updateState(message.params.level);
+            }
+          }
         } // TODO find something more elegant with inheritance... this is shit
       }
     }
+    //this.webSocketClient.
+    //$send = '{"jsonrpc": "2.0", "result": null, "id": "'.$answer['id'].'"}';
+
     // TODO : find the accessory by unicast and update characteristic level
     // {jsonrpc: "2.0", method: "notification", params: []}
   }
@@ -487,9 +498,13 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
             //const nodeAddr = node[0];
             const nodeDef = node[1];
 
-            if (typeof nodeDef === 'object' && nodeDef !== null) {
-              if ('conf state' in nodeDef && nodeDef['conf state'] === 'CONFIGURED' &&
-                  'nodes' in nodeDef && Array.isArray(nodeDef['nodes'])) {
+            if (typeof nodeDef === 'object' && nodeDef !== null &&
+                'conf state' in nodeDef && 'ongoing_conf' in nodeDef) {
+              if ( ((nodeDef['conf state'] === 'GHOST') ||
+              (nodeDef['conf state'] === 'CONFIGURED') ||
+              (nodeDef['conf state'] === 'LOCKED')) ||
+              (nodeDef['ongoing_conf'] !== true) &&
+              'nodes' in nodeDef && Array.isArray(nodeDef['nodes'])) {
                 // --------------------------------- prendre ici les infos du noeud
                 this.log.debug('discovered');
                 this.log.debug('mac '+nodeDef['mac_address']);
@@ -526,18 +541,20 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
                         room: roomName,
                         output_conf: outputType,
                       };
-                      const accessory = this.registerDevice(device);
                       if (device.output_conf === DoozEquipementType.OnOff ||
                           device.output_conf === DoozEquipementType.Relay ||
                           device.output_conf === DoozEquipementType.Dimmer) {
+                        const accessory = this.registerDevice(device);
                         const eq: DoozLightAccessory = new DoozLightAccessory(this, accessory, device);
                         DoozHomebridgePlatform.accessoryLightMap.set(device.unicast, eq);
                       } else if (device.output_conf === DoozEquipementType.Shutter) {
+                        const accessory = this.registerDevice(device);
                         const eq: DoozShutterAccessory = new DoozShutterAccessory(this, accessory, device);
                         DoozHomebridgePlatform.accessoryShutterMap.set(device.unicast, eq);
                       } else if (device.output_conf === DoozEquipementType.Heater) {
-                        const eq: DoozHeaterAccessory = new DoozHeaterAccessory(this, accessory, device);
-                        DoozHomebridgePlatform.accessoryHeaterMap.set(device.unicast, eq);
+                        //const accessory = this.registerDevice(device);
+                        //const eq: DoozHeaterAccessory = new DoozHeaterAccessory(this, accessory, device);
+                        //DoozHomebridgePlatform.accessoryHeaterMap.set(device.unicast, eq);
                       }
                       if (device.output_conf === DoozEquipementType.Shutter as number) {
                         break;
