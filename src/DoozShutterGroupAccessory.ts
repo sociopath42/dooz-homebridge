@@ -109,14 +109,14 @@ export class DoozShutterGroupAccessory {
     this.platform.webSocketClient
       .send('set', {address: this.device.unicast, level: value})
       .then((result) => {
-        this.platform.log.debug('set '+result.level+' ok '+this.device.unicast);
+        //this.platform.log.debug('set '+result.level+' ok '+this.device.unicast);
         this.shutterStates.target = result.level as number;
       })
       .catch((error) => {
         this.platform.log.debug('set fail '+this.device.unicast, error);
       });
 
-    this.platform.log.debug('Set target position -> ', this.shutterStates.target);
+    //this.platform.log.debug('Set target position -> ', this.shutterStates.target);
   }
 
 

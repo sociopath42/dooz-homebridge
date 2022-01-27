@@ -146,7 +146,7 @@ export class DoozLightAccessory {
     this.platform.webSocketClient
       .send('get', {address: this.device.unicast})
       .then((result) => {
-        this.platform.log.debug('get '+result.result.level+' ok '+this.device.unicast);
+        //this.platform.log.debug('get '+result.result.level+' ok '+this.device.unicast);
         isOn = (result.result.level > 0);
         this.lightStates.On = isOn;
         this.lightStates.Brightness = result.result.level as number;
@@ -156,7 +156,7 @@ export class DoozLightAccessory {
         this.platform.log.debug('get fail '+this.device.unicast, error);
       });
 
-    this.platform.log.debug('Get Characteristic On ->', isOn);
+    //this.platform.log.debug('Get Characteristic On ->', isOn);
 
     // if you need to return an error to show the device as "Not Responding" in the Home app:
     // throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
@@ -174,14 +174,14 @@ export class DoozLightAccessory {
     this.platform.webSocketClient
       .send('set', {address: this.device.unicast, level: value})
       .then((result) => {
-        this.platform.log.debug('set '+result.level+' ok '+this.device.unicast);
+        //this.platform.log.debug('set '+result.level+' ok '+this.device.unicast);
         this.lightStates.Brightness = result.leve as number;
       })
       .catch((error) => {
         this.platform.log.debug('set fail '+this.device.unicast, error);
       });
 
-    this.platform.log.debug('Set Characteristic Brightness -> ', this.lightStates.Brightness);
+    //this.platform.log.debug('Set Characteristic Brightness -> ', this.lightStates.Brightness);
   }
 
   async getBrightness(): Promise<CharacteristicValue> {
@@ -190,7 +190,7 @@ export class DoozLightAccessory {
     this.platform.webSocketClient
       .send('get', {address: this.device.unicast})
       .then((result) => {
-        this.platform.log.debug('get '+result.result.level+' ok '+this.device.unicast);
+        //this.platform.log.debug('get '+result.result.level+' ok '+this.device.unicast);
         brightness = result.result.level as number;
         this.lightStates.On = (result.result.level > 0);
         this.lightStates.Brightness = result.result.level as number;
@@ -200,7 +200,7 @@ export class DoozLightAccessory {
         this.platform.log.debug('get fail '+this.device.unicast, error);
       });
 
-    this.platform.log.debug('Get Characteristic Brightness ->', brightness);
+    //this.platform.log.debug('Get Characteristic Brightness ->', brightness);
 
     // if you need to return an error to show the device as "Not Responding" in the Home app:
     // throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);

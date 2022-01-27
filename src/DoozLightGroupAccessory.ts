@@ -136,7 +136,7 @@ export class DoozLightGroupAccessory {
     // implement your own code to turn your device on/off
     this.lightStates.On = value as boolean;
     const state: string = value ? 'on' : 'off';
-    this.platform.log.debug('Set Characteristic On ->', value);
+    //this.platform.log.debug('Set Characteristic On ->', value);
     this.platform.webSocketClient
       .send('set', {address: this.device.unicast, level: state})
       .then((result) => {
@@ -170,7 +170,7 @@ export class DoozLightGroupAccessory {
         this.platform.log.debug('set fail '+this.device.unicast, error);
       });
 
-    this.platform.log.debug('Set Characteristic Brightness -> ', this.lightStates.Brightness);
+    //this.platform.log.debug('Set Characteristic Brightness -> ', this.lightStates.Brightness);
   }
 
   async getBrightness(): Promise<CharacteristicValue> {
