@@ -85,10 +85,18 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
     this.api.on('didFinishLaunching', () => {
       this.connectOopla();
       setInterval(() => {
+        const d = new Date();
+        if (d.getHours() === 0 && d.getMinutes() <= 5) {
+          this.onOoplaDisconnected();
+          this.webSocketClient.end();
+          this.log.info('daily connection refresh: connection closed');
+        }
+
         if (!this.connected) {
+          this.log.debug('Refreshing connection to oopla');
           this.connectOopla();
         }
-      }, (60*1000)); // once per 10 min
+      }, (5 * 60 * 1000)); // once per 5 min
     });
   }
 
