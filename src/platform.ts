@@ -86,7 +86,8 @@ export class DoozHomebridgePlatform implements DynamicPlatformPlugin {
       this.connectOopla();
       setInterval(() => {
         const d = new Date();
-        if (d.getHours() === 0 && d.getMinutes() <= 5) {
+        this.log.debug('actual time : '+d.getHours()+':'+d.getMinutes());
+        if (d.getHours() === 1 && d.getMinutes() <= 5) {
           this.onOoplaDisconnected();
           this.webSocketClient.end();
           this.log.info('daily connection refresh: connection closed');
